@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zeaho-laravel
+  namespace: zeaho
+  labels:
+    app: laravel
+spec:
+  selector:
+    matchLabels:
+      app: laravel
+  template:
+    metadata:
+      labels:
+        app: laravel
+    spec:
+      containers:
+        - name: laravel
+          image: zeaho/laravel
+          imagePullPolicy: Never
+          ports:
+            - name: http-server
+              containerPort: 9000
+          volumeMounts:
+            - name: shared-files
+              mountPath: /var/www/html
+          envFrom:
+            - configMapRef:
+                name: laravel-config
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "cp -r $APP_HOME/. /var/www/html; chown -R $USERNAME:$USERNAME /var/www/html;"]
+          readinessProbe: 
+            # 就绪探针
+            httpGet: 
+              port: 80
+              path: /hello
+              scheme: HTTP
+          livenessProbe: 
+            # 存活探针
+            httpGet: 
+              port: 80
+              path: /hello
+              scheme: HTTP
+        - name: nginx
+          image: zeaho/nginx
+          imagePullPolicy: Never
+          ports:
+            - name: http-server
+              containerPort: 80
+          volumeMounts:
+            - name: shared-files
+              mountPath: /var/www/html
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+
+      volumes:
+        - name: shared-files
+          emptyDir: {}
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
